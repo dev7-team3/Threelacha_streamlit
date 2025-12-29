@@ -1,0 +1,13 @@
+[project]
+name = "threelacha-streamlit"
+version = "0.1.0"
+description = "농산물 가격 대시보드 Streamlit 애플리케이션"
+requires-python = ">=3.9"
+dependencies = [
+    "streamlit>=1.28.0",
+    "pandas>=2.0.0",
+    "boto3>=1.28.0",
+    "folium>=0.14.0",
+    "streamlit-folium>=0.15.0",
+    "python-dotenv>=1.0.0",
+]
