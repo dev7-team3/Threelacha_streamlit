@@ -55,7 +55,7 @@ def create_region_map(
     m = folium.Map(
         location=[36.5, 127.5],  # 한국 중심 좌표
         zoom_start=7,
-        tiles="cartodbpositrononlylabels",
+        tiles="openstreetmap",
     )
 
     # 데이터가 없으면 기본 지도만 반환
@@ -110,7 +110,9 @@ def create_region_map(
         # 마커 추가 (더 깔끔한 스타일)
         folium.CircleMarker(
             location=coords,
-            radius=12 + (price / max_price * 15) if max_price > 0 else 12,  # 가격에 비례한 크기
+            radius=12 + (price / max_price * 15)
+            if max_price > 0
+            else 12,  # 가격에 비례한 크기
             popup=folium.Popup(popup_text, max_width=200),
             tooltip=f"{region_name}: {price:,.0f}원",
             color="white",
@@ -179,10 +181,14 @@ def render_selected_item_region_map(date_filter=None, category_filter=None):
         return
 
     st.divider()
-    st.subheader(f"🗺️ {st.session_state.selected_item_nm}({st.session_state.selected_kind_nm}) 지역별 가격 지도")
+    st.subheader(
+        f"🗺️ {st.session_state.selected_item_nm}({st.session_state.selected_kind_nm}) 지역별 가격 지도"
+    )
 
     # 지역별 데이터 조회
-    region_stats_query = get_region_stats_query(date_filter=date_filter, category_filter=category_filter)
+    region_stats_query = get_region_stats_query(
+        date_filter=date_filter, category_filter=category_filter
+    )
 
     with st.spinner("지역별 데이터를 불러오는 중..."):
         try:
@@ -197,20 +203,31 @@ def render_selected_item_region_map(date_filter=None, category_filter=None):
 
                 if len(df_filtered) > 0:
                     # 지역별 평균 가격으로 그룹화
-                    df_region_agg = df_filtered.groupby("country_nm").agg({"평균가격": "mean"}).reset_index()
+                    df_region_agg = (
+                        df_filtered.groupby("country_nm")
+                        .agg({"평균가격": "mean"})
+                        .reset_index()
+                    )
+
+                    col1, col2 = st.columns(2)
 
                     # 지도 표시
-                    render_region_map(
-                        df_region_agg,
-                        price_column="평균가격",
-                        region_column="country_nm",
-                        selected_item=f"{st.session_state.selected_item_nm}({st.session_state.selected_kind_nm})",
-                    )
+                    with col1:
+                        render_region_map(
+                            df_region_agg,
+                            price_column="평균가격",
+                            region_column="country_nm",
+                            selected_item=f"{st.session_state.selected_item_nm}({st.session_state.selected_kind_nm})",
+                        )
 
                     # 데이터 테이블도 함께 표시
-                    st.dataframe(
-                        df_filtered[["country_nm", "평균가격", "최저가격", "최고가격"]], use_container_width=True
-                    )
+                    with col2:
+                        st.dataframe(
+                            df_filtered[
+                                ["country_nm", "평균가격", "최저가격", "최고가격"]
+                            ],
+                            use_container_width=True,
+                        )
 
                     # 닫기 버튼
                     if st.button("지도 닫기", key="close_map_btn"):
