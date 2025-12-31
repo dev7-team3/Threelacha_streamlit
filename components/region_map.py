@@ -5,8 +5,8 @@ import pandas as pd
 from typing import Optional
 import streamlit as st
 from streamlit_folium import st_folium
-from data.athena_connection import execute_athena_query
 from data.queries.region_queries import get_region_stats_query
+from data.connection import DatabaseConnection
 
 
 # 한국 주요 도시 좌표
@@ -166,7 +166,9 @@ def render_region_map(
     st_folium(m, width=700, height=height, returned_objects=[])
 
 
-def render_selected_item_region_map(date_filter=None, category_filter=None):
+def render_selected_item_region_map(
+    conn: DatabaseConnection, date_filter=None, category_filter=None
+):
     """선택된 품목의 지역별 지도를 표시하는 함수.
 
     Args:
@@ -187,12 +189,12 @@ def render_selected_item_region_map(date_filter=None, category_filter=None):
 
     # 지역별 데이터 조회
     region_stats_query = get_region_stats_query(
-        date_filter=date_filter, category_filter=category_filter
+        date_filter=date_filter, category_filter=category_filter, conn=conn
     )
 
     with st.spinner("지역별 데이터를 불러오는 중..."):
         try:
-            df_region = execute_athena_query(region_stats_query)
+            df_region = conn.execute_query(region_stats_query)
 
             if len(df_region) > 0:
                 # 선택된 품목 필터링
