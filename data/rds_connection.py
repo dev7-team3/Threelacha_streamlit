@@ -12,6 +12,7 @@ class RDSConnection(DatabaseConnection):
     def __init__(self):
         self._engine = None
         self._database = os.getenv("RDS_DB")
+        self._schema = os.getenv("RDS_SCHEMA")
         self._host = os.getenv("RDS_HOST")
         self._port = os.getenv("RDS_PORT", "5432")
         self._user = os.getenv("RDS_USER")
@@ -22,7 +23,7 @@ class RDSConnection(DatabaseConnection):
         Returns:
             tuple[str, str]: database, host
         """
-        return self._database, self._user
+        return self._schema, self._database
 
     def _get_engine(self):
         """RDS 엔진을 생성하고 반환합니다."""
