@@ -2,8 +2,8 @@
 
 import streamlit as st
 import pandas as pd
-from data.athena_connection import execute_athena_query
 from data.queries.eco_channel_queries import get_latest_price_statistics_query
+from data.connection import DatabaseConnection
 
 
 def render_market_price_card(
@@ -227,19 +227,19 @@ def render_price_comparison_pivot(df_data: pd.DataFrame):
         st.dataframe(df_data, use_container_width=True)
 
 
-def render_eco_page():
+def render_eco_page(conn: DatabaseConnection):
     """친환경 페이지 전체를 렌더링합니다."""
     st.title("친환경 살펴보기")
     st.divider()
 
     try:
         # 최신 데이터 쿼리 가져오기
-        latest_data_query = get_latest_price_statistics_query()
+        latest_data_query = get_latest_price_statistics_query(conn=conn)
 
         with st.spinner("Athena에서 최신 데이터를 불러오는 중..."):
             try:
                 # Athena 쿼리 실행
-                df_data = execute_athena_query(latest_data_query)
+                df_data = conn.execute_query(latest_data_query)
 
                 if len(df_data) > 0:
                     # 최신 데이터 날짜 표시

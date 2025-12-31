@@ -14,18 +14,20 @@ from components.price_cards import render_price_drop_cards, render_price_rise_ca
 from components.region_map import render_selected_item_region_map
 from components.season_selector import render_season_selector
 from components.eco_panel import render_eco_page
-from data.athena_connection import execute_athena_query, get_athena_config
 from data.queries.channel_queries import get_channel_comparison_query
-from data.queries.price_queries import get_country_list, get_price_drop_top3_query, get_price_rise_top3_query
-from data.rds_connection import execute_rds_query
-
-
+from data.queries.price_queries import (
+    get_country_list,
+    get_price_drop_top3_query,
+    get_price_rise_top3_query,
+)
+from data.connection import get_database_connection
 
 
 def load_css():
     base_path = Path(__file__).parent
     with open(base_path / "styles.css") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
 
 load_css()
 
@@ -42,6 +44,11 @@ st.set_page_config(page_title="농산물 가격 대시보드", layout="wide")
 
 if "page" not in st.session_state:
     st.session_state.page = "main"
+
+connection = os.getenv("DB_CONNECTION", "athena")
+conn = get_database_connection(
+    connection
+)  # 여기서 rds와 athena 중 하나를 선택할 수 있도록 해야함
 
 # 세션 상태 초기화
 if "show_region_map" not in st.session_state:
@@ -80,47 +87,49 @@ if st.session_state.page == "main":
     # -------------------------
     # 1️⃣ 상단 필터 (columns 밖)
     # -------------------------
-    country_list_df = get_country_list(conn)
-    country_list = country_list_df['country_nm'].drop_duplicates().sort_values().tolist()
+    country_list_df = conn.execute_query(get_country_list(conn=conn))
+    country_list = (
+        country_list_df["country_nm"].drop_duplicates().sort_values().tolist()
+    )
 
-    if 'country' not in st.session_state:
+    if "country" not in st.session_state:
         st.session_state.country = country_list[0]  # 기본값
 
     country = st.selectbox(
-        "지역 선택", 
+        "지역 선택",
         country_list,
         index=country_list.index(st.session_state.country),
-        key='country'
+        key="country",
     )
-
 
     center, right = st.columns([3, 1])
 
-    
     # -------------------------
     # 중앙 영역
     # -------------------------
 
     with center:
         c1, c2 = st.columns(2)
-        #tab1, tab2 = st.tabs(["가격 하락 TOP3", "가격 상승 TOP3"])
+        # tab1, tab2 = st.tabs(["가격 하락 TOP3", "가격 상승 TOP3"])
 
         with c1:
-        #with tab1:
+            # with tab1:
             st.subheader("📉 전일 대비 가격 하락 TOP 3")
 
-            query = get_price_drop_top3_query(country_filter=country)
+            query = get_price_drop_top3_query(country_filter=country, conn=conn)
             print(query)
-            cheep_df = pd.read_sql(query, conn)
+            cheep_df = conn.execute_query(query)
 
             render_price_drop_cards(cheep_df)
 
         with c2:
-        #with tab2:
+            # with tab2:
             st.subheader("📈 전일 대비 가격 상승 TOP 3")
 
-            query = get_price_rise_top3_query(country_filter=country) #, limit=3)
-            rise_df = pd.read_sql(query, conn)
+            query = get_price_rise_top3_query(
+                country_filter=country, conn=conn
+            )  # , limit=3)
+            rise_df = conn.execute_query(query)
 
             render_price_rise_cards(rise_df)
 
@@ -139,7 +148,6 @@ if st.session_state.page == "main":
             st.subheader("🌱 제철 식재료 지역별 가격 지도")
             st.caption("※ 현재 제철 식재료 기준")
 
-
     # -------------------------
     # 우측 영역 (추가 기능)
     # -------------------------
@@ -151,7 +159,7 @@ if st.session_state.page == "main":
 # 친환경 페이지
 # =================================================
 elif st.session_state.page == "eco":
-    render_eco_page()
+    render_eco_page(conn)
 
 # =================================================
 # 유통업체 페이지
@@ -168,25 +176,39 @@ elif st.session_state.page == "dist":
         with col2:
             category_filter = st.selectbox(
                 "카테고리 선택",
-                ["전체", "식량작물", "채소류", "특용작물", "과일류", "축산물", "수산물"],
+                [
+                    "전체",
+                    "식량작물",
+                    "채소류",
+                    "특용작물",
+                    "과일류",
+                    "축산물",
+                    "수산물",
+                ],
                 key="dist_category",
             )
         with col3:
             # 버튼을 아래로 정렬하기 위한 빈 공간 추가
             st.markdown("<br>", unsafe_allow_html=True)
             query_button = st.button(
-                "데이터 조회", type="primary", key="dist_query_button", use_container_width=True
+                "데이터 조회",
+                type="primary",
+                key="dist_query_button",
+                use_container_width=True,
             )
 
         # 유통 vs 전통 비교 쿼리 생성
         comparison_query = get_channel_comparison_query(
-            date_filter=date_filter, category_filter=category_filter, limit=None
+            date_filter=date_filter,
+            category_filter=category_filter,
+            limit=None,
+            conn=conn,
         )
 
         if query_button:
             with st.spinner("데이터를 불러오는 중..."):
                 try:
-                    df_comparison = execute_athena_query(comparison_query)
+                    df_comparison = conn.execute_query(comparison_query)
 
                     if len(df_comparison) > 0:
                         # 세션 상태에 쿼리 결과 저장
@@ -216,8 +238,11 @@ elif st.session_state.page == "dist":
 
                         # 선택된 품목이 있으면 지역별 지도 표시
                         render_selected_item_region_map(
+                            conn=conn,
                             date_filter=st.session_state.get("query_date_filter"),
-                            category_filter=st.session_state.get("query_category_filter"),
+                            category_filter=st.session_state.get(
+                                "query_category_filter"
+                            ),
                         )
 
                         st.divider()
@@ -231,7 +256,10 @@ elif st.session_state.page == "dist":
                     st.info("💡 Athena 연결 설정을 확인하세요.")
 
         # 쿼리 버튼이 눌러지지 않았지만 이전에 조회한 데이터가 있고 지도 표시 요청이 있는 경우
-        elif "df_comparison" in st.session_state and len(st.session_state.df_comparison) > 0:
+        elif (
+            "df_comparison" in st.session_state
+            and len(st.session_state.df_comparison) > 0
+        ):
             df_comparison = st.session_state.df_comparison
 
             # 요약 통계
@@ -256,6 +284,7 @@ elif st.session_state.page == "dist":
 
             # 선택된 품목이 있으면 지역별 지도 표시
             render_selected_item_region_map(
+                conn=conn,
                 date_filter=st.session_state.get("query_date_filter"),
                 category_filter=st.session_state.get("query_category_filter"),
             )
@@ -283,19 +312,14 @@ with st.sidebar:
     st.markdown("### 연결 정보")
 
     # 현재 페이지에 따라 다른 연결 정보 표시
-    database, workgroup = get_athena_config()
     st.info(f"""
-    **Athena 설정:**
-    - Database: {database}
-    - WorkGroup: {workgroup}
-    - Region: {os.getenv("AWS_REGION", "ap-northeast-2")}
+    **{conn.__class__.__name__} 설정:**
+    - Database: {conn.get_config()[0]}
+    - WorkGroup: {conn.get_config()[1]}
     """)
     # RDS 헬스체크
     try:
-        from data.rds_connection import execute_rds_query
-        execute_rds_query(
-            "SELECT 1 FROM mart.api10_price_comparison LIMIT 1"
-        )
+        conn.execute_query("SELECT 1 FROM mart.api10_price_comparison LIMIT 1")
         st.success("RDS 연결 정상")
     except Exception:
         st.error("RDS 연결 실패")
