@@ -17,7 +17,9 @@ from components.eco_panel import render_eco_page
 from data.athena_connection import execute_athena_query, get_athena_config
 from data.queries.channel_queries import get_channel_comparison_query
 from data.queries.price_queries import get_country_list, get_price_drop_top3_query, get_price_rise_top3_query
-from data.sample_data import get_price_summary, get_popular_items
+from data.rds_connection import execute_rds_query
+
+
 
 
 def load_css():
@@ -25,12 +27,16 @@ def load_css():
     with open(base_path / "styles.css") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-
 load_css()
 
-summary = get_price_summary()
-popular_items = get_popular_items()
+# sample_data 삭제 후 임시 데이터
+summary = {
+    "cheap": {"item_nm": "연결 테스트", "avg_price": 0},
+    "expensive": {"item_nm": "연결 테스트", "avg_price": 0},
+    "suggest": {"item_nm": "연결 테스트", "avg_price": 0},
+}
 
+popular_items = []
 
 st.set_page_config(page_title="농산물 가격 대시보드", layout="wide")
 
@@ -138,7 +144,7 @@ if st.session_state.page == "main":
     # 우측 영역 (추가 기능)
     # -------------------------
     with right:
-        render_extra_panel(popular_items)
+        render_extra_panel()
 
 
 # =================================================
@@ -284,3 +290,12 @@ with st.sidebar:
     - WorkGroup: {workgroup}
     - Region: {os.getenv("AWS_REGION", "ap-northeast-2")}
     """)
+    # RDS 헬스체크
+    try:
+        from data.rds_connection import execute_rds_query
+        execute_rds_query(
+            "SELECT 1 FROM mart.api10_price_comparison LIMIT 1"
+        )
+        st.success("RDS 연결 정상")
+    except Exception:
+        st.error("RDS 연결 실패")
