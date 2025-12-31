@@ -45,8 +45,9 @@ st.set_page_config(page_title="농산물 가격 대시보드", layout="wide")
 if "page" not in st.session_state:
     st.session_state.page = "main"
 
+connection = os.getenv("DB_CONNECTION", "athena")
 conn = get_database_connection(
-    "athena"
+    connection
 )  # 여기서 rds와 athena 중 하나를 선택할 수 있도록 해야함
 
 # 세션 상태 초기화
