@@ -10,12 +10,13 @@ load_dotenv()
 
 from components.channel_cards import render_channel_comparison_sections
 from components.extra_panel import render_extra_panel
-from components.price_cards import price_card
+from components.price_cards import render_price_drop_cards, render_price_rise_cards
 from components.region_map import render_selected_item_region_map
 from components.season_selector import render_season_selector
 from components.eco_panel import render_eco_page
 from data.athena_connection import execute_athena_query, get_athena_config
 from data.queries.channel_queries import get_channel_comparison_query
+from data.queries.price_queries import get_country_list, get_price_drop_top3_query, get_price_rise_top3_query
 from data.sample_data import get_price_summary, get_popular_items
 
 
@@ -70,25 +71,56 @@ if st.session_state.page == "main":
     st.title("오늘 눈여겨볼 만한 식재료들")
     st.divider()
 
+    # -------------------------
+    # 1️⃣ 상단 필터 (columns 밖)
+    # -------------------------
+    country_list_df = get_country_list(conn)
+    country_list = country_list_df['country_nm'].drop_duplicates().sort_values().tolist()
+
+    if 'country' not in st.session_state:
+        st.session_state.country = country_list[0]  # 기본값
+
+    country = st.selectbox(
+        "지역 선택", 
+        country_list,
+        index=country_list.index(st.session_state.country),
+        key='country'
+    )
+
+
     center, right = st.columns([3, 1])
 
+    
     # -------------------------
     # 중앙 영역
     # -------------------------
+
     with center:
-        c1, c2, c3 = st.columns(3)
+        c1, c2 = st.columns(2)
+        #tab1, tab2 = st.tabs(["가격 하락 TOP3", "가격 상승 TOP3"])
 
         with c1:
-            st.subheader("가장 싸요")
-            price_card(summary["cheap"], "#eaf2fb")
+        #with tab1:
+            st.subheader("📉 전일 대비 가격 하락 TOP 3")
+
+            query = get_price_drop_top3_query(country_filter=country)
+            print(query)
+            cheep_df = pd.read_sql(query, conn)
+
+            render_price_drop_cards(cheep_df)
 
         with c2:
-            st.subheader("가장 비싸요")
-            price_card(summary["expensive"], "#fff8e1")
+        #with tab2:
+            st.subheader("📈 전일 대비 가격 상승 TOP 3")
 
-        with c3:
-            st.subheader("이건 어때요")
-            price_card(summary["suggest"], "#eaf7ea")
+            query = get_price_rise_top3_query(country_filter=country) #, limit=3)
+            rise_df = pd.read_sql(query, conn)
+
+            render_price_rise_cards(rise_df)
+
+        # with c3:
+        #     st.subheader("이건 어때요")
+        #     price_card(summary["suggest"], '#eaf7ea')
 
         st.divider()
 
@@ -98,7 +130,9 @@ if st.session_state.page == "main":
             render_season_selector()
 
         with bottom_right:
-            st.info("※ 이 영역에 지도 / 차트가 들어갈 예정입니다.")
+            st.subheader("🌱 제철 식재료 지역별 가격 지도")
+            st.caption("※ 현재 제철 식재료 기준")
+
 
     # -------------------------
     # 우측 영역 (추가 기능)
