@@ -52,7 +52,8 @@ def get_channel_comparison_query(
     GROUP BY item_nm, kind_nm
     HAVING MAX(CASE WHEN channel_type = '유통' THEN avg_price END) IS NOT NULL
        AND MAX(CASE WHEN channel_type = '전통' THEN avg_price END) IS NOT NULL
-    ORDER BY ABS("가격차이") DESC
+    ORDER BY ABS(MAX(CASE WHEN channel_type = '유통' THEN avg_price END) - 
+                MAX(CASE WHEN channel_type = '전통' THEN avg_price END)) DESC
     {limit_clause}
     """
 

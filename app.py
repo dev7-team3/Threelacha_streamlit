@@ -159,9 +159,7 @@ if st.session_state.page == "main":
 # 친환경 페이지
 # =================================================
 elif st.session_state.page == "eco":
-    # 친환경 페이지는 Athena 연결 사용 (mart_eco_price_statistics_by_category 테이블이 Athena에만 존재)
-    athena_conn = get_database_connection("athena")
-    render_eco_page(athena_conn)
+    render_eco_page(conn)
 
 # =================================================
 # 유통업체 페이지
