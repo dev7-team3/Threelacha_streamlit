@@ -317,9 +317,3 @@ with st.sidebar:
     - Database: {conn.get_config()[0]}
     - WorkGroup: {conn.get_config()[1]}
     """)
-    # RDS 헬스체크
-    try:
-        conn.execute_query("SELECT 1 FROM mart.api10_price_comparison LIMIT 1")
-        st.success("RDS 연결 정상")
-    except Exception:
-        st.error("RDS 연결 실패")

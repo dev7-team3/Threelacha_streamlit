@@ -10,6 +10,9 @@ import streamlit as st
 from botocore.exceptions import ClientError, NoCredentialsError
 
 from data.connection import DatabaseConnection
+from data.logger import setup_logger
+
+logger = setup_logger("athena_connection")
 
 
 class AthenaConnection(DatabaseConnection):
@@ -22,6 +25,9 @@ class AthenaConnection(DatabaseConnection):
         self._output_location = os.getenv(
             "ATHENA_OUTPUT_LOCATION",
             "s3://team3-batch/gold/athena-results/",
+        )
+        logger.info(
+            f"AthenaConnection 초기화: database={self._database}, workgroup={self._workgroup}"
         )
 
     def get_config(self) -> tuple[str, str]:
@@ -74,9 +80,15 @@ class AthenaConnection(DatabaseConnection):
         Returns:
             pd.DataFrame: 쿼리 결과를 담은 DataFrame
         """
+        start_time = time.time()
+        connection_type = "athena"
+
         database = database or self._database
         workgroup = workgroup or self._workgroup
         output_location = output_location or self._output_location
+
+        logger.info(f"[{connection_type}] 쿼리 실행 시작")
+        logger.debug(f"[{connection_type}] 쿼리: {query[:200]}...")  # 처음 200자만 로깅
 
         client = self._get_client()
 
@@ -90,8 +102,10 @@ class AthenaConnection(DatabaseConnection):
             )
 
             query_execution_id = response["QueryExecutionId"]
+            logger.debug(f"[{connection_type}] QueryExecutionId: {query_execution_id}")
 
             # 쿼리 완료 대기
+            wait_start = time.time()
             while True:
                 response = client.get_query_execution(
                     QueryExecutionId=query_execution_id
@@ -103,16 +117,24 @@ class AthenaConnection(DatabaseConnection):
 
                 time.sleep(1)
 
+            wait_time = time.time() - wait_start
+            logger.debug(f"[{connection_type}] 쿼리 대기 시간: {wait_time:.2f}초")
+
             if status == "FAILED":
                 reason = response["QueryExecution"]["Status"].get(
                     "StateChangeReason", "Unknown error"
                 )
-                raise Exception(f"Athena 쿼리 실패: {reason}")
+                error_msg = f"Athena 쿼리 실패: {reason}"
+                logger.error(f"[{connection_type}] {error_msg}")
+                raise Exception(error_msg)
 
             if status == "CANCELLED":
-                raise Exception("Athena 쿼리가 취소되었습니다.")
+                error_msg = "Athena 쿼리가 취소되었습니다."
+                logger.warning(f"[{connection_type}] {error_msg}")
+                raise Exception(error_msg)
 
             # 결과 가져오기
+            fetch_start = time.time()
             results = client.get_query_results(QueryExecutionId=query_execution_id)
 
             # 첫 번째 행은 컬럼명
@@ -165,13 +187,40 @@ class AthenaConnection(DatabaseConnection):
 
             # 최종 DataFrame 재생성 (모든 데이터 수집 후)
             df = pd.DataFrame(rows, columns=columns)
+
+            fetch_time = time.time() - fetch_start
+            total_time = time.time() - start_time
+
+            logger.info(
+                f"[{connection_type}] 쿼리 완료 - "
+                f"총 시간: {total_time:.2f}초, "
+                f"대기 시간: {wait_time:.2f}초, "
+                f"결과 가져오기: {fetch_time:.2f}초, "
+                f"행 수: {len(df)}"
+            )
+
+            # Streamlit 세션 상태에 성능 정보 저장
+            if "query_performance" not in st.session_state:
+                st.session_state.query_performance = []
+
+            st.session_state.query_performance.append({
+                "connection_type": connection_type,
+                "total_time": total_time,
+                "wait_time": wait_time,
+                "fetch_time": fetch_time,
+                "row_count": len(df),
+                "query_preview": query[:100],
+            })
+
             return df
 
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code", "Unknown")
             error_message = e.response.get("Error", {}).get("Message", f"{e!s}")
-            raise Exception(
-                f"Athena 클라이언트 오류 ({error_code}): {error_message}"
-            ) from e
+            error_msg = f"Athena 클라이언트 오류 ({error_code}): {error_message}"
+            logger.error(f"[{connection_type}] {error_msg}", exc_info=True)
+            raise Exception(error_msg) from e
         except Exception as e:
-            raise Exception(f"Athena 쿼리 실행 중 오류: {e!s}") from e
+            error_msg = f"Athena 쿼리 실행 중 오류: {e!s}"
+            logger.error(f"[{connection_type}] {error_msg}", exc_info=True)
+            raise Exception(error_msg) from e
