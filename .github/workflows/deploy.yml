@@ -55,6 +55,9 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: ${{ secrets.EC2_PORT || 22 }}
           script: |
+            # 프로젝트 디렉토리 경로 설정
+            PROJECT_DIR="/home/${{ secrets.EC2_USER }}/Threelacha_streamlit"
+            
             # Docker가 설치되어 있는지 확인
             if ! command -v docker &> /dev/null; then
               echo "Docker가 설치되어 있지 않습니다. 설치를 진행합니다..."
@@ -88,7 +91,7 @@ jobs:
               --name ${{ env.DOCKER_IMAGE_NAME }} \
               --restart unless-stopped \
               -p 8501:8501 \
-              --env-file /home/${{ secrets.EC2_USER }}/.env \
+              --env-file /home/${{ secrets.EC2_USER }}/Threelacha-streamlit/.env \
               ${{ env.DOCKER_IMAGE_NAME }}:latest
             
             # 컨테이너 상태 확인
