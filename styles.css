@@ -52,9 +52,12 @@ section[data-testid="stSidebar"] {
 /* 기본 타이포 스케일 */
 h1, h2, h3 {
     font-family: 'ChangwonDangam', sans-serif !important;
+    word-break: keep-all;   
+    white-space: normal;
+    line-height: 1.25;
 }
-h1 { font-size: 1.8rem; }
-h2 { font-size: 1.4rem; }
+h1 { font-size: 1.6rem; }
+h2 { font-size: 1.3rem; }
 h3 { font-size: 1.1rem; }
 
 /* 본문 전체 폰트 */ html, body, [data-testid="stAppViewContainer"] {
