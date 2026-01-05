@@ -91,7 +91,7 @@ jobs:
               --name ${{ env.DOCKER_IMAGE_NAME }} \
               --restart unless-stopped \
               -p 8501:8501 \
-              --env-file /home/${{ secrets.EC2_USER }}/Threelacha-streamlit/.env \
+              --env-file /home/${{ secrets.EC2_USER }}/Threelacha_streamlit/.env \
               ${{ env.DOCKER_IMAGE_NAME }}:latest
             
             # 컨테이너 상태 확인
