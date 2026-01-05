@@ -21,11 +21,16 @@ from components.extra_panel import render_extra_panel
 from components.region_map import render_selected_item_region_map
 from components.season_selector import render_season_selector
 from components.eco_panel import render_eco_page
-    # price
+
+# price
 from components.price_cards import render_price_drop_cards, render_price_rise_cards
 from components.price_graph import render_price_region_donut
-    # season
-from components.season_cards import render_region_price_comparison, render_region_all_items_chart
+
+# season
+from components.season_cards import (
+    render_region_price_comparison,
+    render_region_all_items_chart,
+)
 from components.season_map import create_season_price_map
 
 # data & queries
@@ -36,13 +41,13 @@ from data.queries.price_queries import (
     get_country_list,
     get_price_drop_top3_query,
     get_price_rise_top3_query,
-    get_price_region_rate_query
+    get_price_region_rate_query,
 )
 from data.queries.season_queries import (
     get_season,
     get_season_item_list,
     get_season_region_price_query,
-    get_region_all_items_price_query
+    get_region_all_items_price_query,
 )
 
 
@@ -50,6 +55,7 @@ def load_css():
     base_path = Path(__file__).parent
     with open(base_path / "styles.css", encoding="utf-8") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
 
 # 초기 설정
 st.set_page_config(page_title="농산물 가격 대시보드", layout="wide")
@@ -65,9 +71,6 @@ summary = {
 popular_items = []
 # ======================================================================
 
-# 메타 정보 조회
-status_df = pd.read_sql(get_update_status_query(), conn)
-update_status = status_df.iloc[0]
 
 if "page" not in st.session_state:
     st.session_state.page = "main"
@@ -76,6 +79,10 @@ connection = os.getenv("DB_CONNECTION", "athena")
 conn = get_database_connection(
     connection
 )  # 여기서 rds와 athena 중 하나를 선택할 수 있도록 해야함
+
+# 메타 정보 조회
+status_df = conn.execute_query(get_update_status_query(conn=conn))
+update_status = status_df.iloc[0]
 
 # 세션 상태 초기화
 if "show_region_map" not in st.session_state:
@@ -118,17 +125,13 @@ if st.session_state.page == "main":
             st.title("오늘의 지역별 농산물 가격 동향 한눈에 보기")
         with header_right:
             m1, m2, m3 = st.columns(3)
-            m1.metric(
-                label="📅 최신 업데이트",
-                value=str(update_status["latest_date"])
-            )
+            m1.metric(label="📅 최신 업데이트", value=str(update_status["latest_date"]))
             m2.metric(
                 label="📦 업데이트 품목 수",
-                value=f"{int(update_status['row_count']):,}"
+                value=f"{int(update_status['row_count']):,}",
             )
             m3.metric(
-                label="🌍 업데이트 지역 수",
-                value=int(update_status["country_count"])
+                label="🌍 업데이트 지역 수", value=int(update_status["country_count"])
             )
     st.divider()
 
@@ -137,7 +140,7 @@ if st.session_state.page == "main":
     # -------------------------
     st.subheader("🌱 오늘 눈여겨볼 만한 식재료들")
     st.markdown(
-    """
+        """
     <div class="callout">
         <div class="callout-title">💡 어떻게 보면 좋을까요?</div>
         지역을 선택하면 <b>전일 대비 가격 변동이 가장 큰</b> 농수산물 TOP 3를 확인할 수 있어요.<br>
@@ -145,26 +148,27 @@ if st.session_state.page == "main":
         해당 지역에서 전체 품목 중 <b>상승·하락·유지 비율</b>을 도넛 차트를 통해 한눈에 볼 수 있습니다.
     </div>
     """,
-    unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     # -------------------------
     # [part 1: price] 지역 선택
     # -------------------------
     country_list_df = get_country_list(conn)
-    country_list = country_list_df['country_nm'].drop_duplicates().sort_values().tolist()
+    country_list = (
+        country_list_df["country_nm"].drop_duplicates().sort_values().tolist()
+    )
 
-    if 'country' not in st.session_state:
+    if "country" not in st.session_state:
         st.session_state.country = country_list[0]
 
     country = st.selectbox(
-        "지역 선택", 
+        "지역 선택",
         country_list,
         index=country_list.index(st.session_state.country),
-        key='country'
+        key="country",
     )
     # st.markdown(f"선택된 지역: **{country}**")  # 선택 확인용
-
 
     c1, c2, c3 = st.columns(3)
 
@@ -173,21 +177,23 @@ if st.session_state.page == "main":
     # -------------------------
     with c1:
         st.subheader("📉 전일 대비 가격 하락 TOP 3")
-        drop_query = get_price_drop_top3_query(country_filter=country)
-        print(drop_query) # debug
-        cheep_df = pd.read_sql(drop_query, conn)
+        drop_query = get_price_drop_top3_query(country_filter=country, conn=conn)
+        print(drop_query)  # debug
+        cheep_df = conn.execute_query(drop_query)
         render_price_drop_cards(cheep_df)
 
     with c2:
         st.subheader("📈 전일 대비 가격 상승 TOP 3")
-        rise_query = get_price_rise_top3_query(country_filter=country) #, limit=3)
-        rise_df = pd.read_sql(rise_query, conn)
+        rise_query = get_price_rise_top3_query(
+            country_filter=country, conn=conn
+        )  # , limit=3)
+        rise_df = conn.execute_query(rise_query)
         render_price_rise_cards(rise_df)
 
     with c3:
         st.subheader("📊 상승/하락/유지 품목 비율")
-        summary_query = get_price_region_rate_query(country_filter=country)
-        summary_df = pd.read_sql(summary_query, conn)
+        summary_query = get_price_region_rate_query(country_filter=country, conn=conn)
+        summary_df = conn.execute_query(summary_query)
         render_price_region_donut(summary_df, country)
 
     st.divider()
@@ -195,15 +201,15 @@ if st.session_state.page == "main":
     # --------------------------
     # [PART 2: season] sub-title
     # --------------------------
-    season_nm_query = get_season()
-    season_nm = pd.read_sql(season_nm_query, conn)
+    season_nm_query = get_season(conn=conn)
+    season_nm = conn.execute_query(season_nm_query)
 
     season = season_nm["season"].iloc[0]
     st.markdown(
         f"""
         <h3>❄️ <span style="color:#1f77b4">{season}</span> 제철 식자재 가격 지도 톺아보기</h3>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     st.markdown(
@@ -220,7 +226,7 @@ if st.session_state.page == "main":
             </ul>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     # -----------------------
@@ -236,8 +242,8 @@ if st.session_state.page == "main":
     # -----------------------------
     # [PART 2: season] select item
     # -----------------------------
-    item_query = get_season_item_list()
-    item_df = pd.read_sql(item_query, conn)
+    item_query = get_season_item_list(conn=conn)
+    item_df = conn.execute_query(item_query)
     item_list = item_df["item_kind"].dropna().tolist()
 
     if not item_list:
@@ -250,19 +256,21 @@ if st.session_state.page == "main":
     bottom_left, bottom_right = st.columns([1, 1])
 
     with bottom_left:
-#        st.subheader("🔎 필터")
+        #        st.subheader("🔎 필터")
         selected_item_kind = st.selectbox(
             f"{season} 제철 농수산물 선택",
             item_list,
             index=item_list.index(st.session_state.selected_item),
-            key="selected_item"
+            key="selected_item",
         )
 
     # -----------------------------
     # [PART 2: season] query to df
     # -----------------------------
-    season_query = get_season_region_price_query(item_kind_filter=selected_item_kind)
-    season_df = pd.read_sql(season_query, conn)
+    season_query = get_season_region_price_query(
+        item_kind_filter=selected_item_kind, conn=conn
+    )
+    season_df = conn.execute_query(season_query)
 
     # 디버깅용 저장
     season_df.to_csv("season_df_debug.csv", index=False, encoding="utf-8-sig")
@@ -272,8 +280,8 @@ if st.session_state.page == "main":
         st.stop()
 
     # 결측치 처리
-    season_df['prev_1y_pr'] = season_df['prev_1y_pr'].fillna(0)
-    season_df['base_pr'] = season_df['base_pr'].fillna(0)
+    season_df["prev_1y_pr"] = season_df["prev_1y_pr"].fillna(0)
+    season_df["base_pr"] = season_df["base_pr"].fillna(0)
 
     # ---------------------------
     # [PART 2: season] geo json
@@ -286,10 +294,7 @@ if st.session_state.page == "main":
 
     merged_geojson = load_geojson()
     season_map = create_season_price_map(
-        merged_geojson,
-        season_df,
-        season_df,
-        selected_item_kind
+        merged_geojson, season_df, season_df, selected_item_kind
     )
 
     with bottom_left:
@@ -304,12 +309,12 @@ if st.session_state.page == "main":
         if unit:
             st.markdown(
                 f"<h4>🗺️ <span style='color:#0095fa'>{selected_item_kind}({unit})</span> 지역별 가격 분포</h4>",
-                unsafe_allow_html=True
+                unsafe_allow_html=True,
             )
         else:
             st.markdown(
                 f"<h4>🗺️ <span style='color:#0095fa'>{selected_item_kind}</span> 지역별 가격 분포</h4>",
-                unsafe_allow_html=True
+                unsafe_allow_html=True,
             )
 
         _map_state = st_folium(
@@ -317,7 +322,7 @@ if st.session_state.page == "main":
             width=1000,
             height=650,
             key="season_map",
-            returned_objects=["last_active_drawing"]
+            returned_objects=["last_active_drawing"],
         )
 
     clicked_region = None
@@ -331,10 +336,12 @@ if st.session_state.page == "main":
     with bottom_right:
         if clicked_region:
             region_df = season_df[season_df["country_nm"] == clicked_region]
-            render_region_price_comparison(region_df, clicked_region, selected_item_kind)
-        
-        region_all_query = get_region_all_items_price_query(clicked_region)
-        region_all_df = pd.read_sql(region_all_query, conn)
+            render_region_price_comparison(
+                region_df, clicked_region, selected_item_kind
+            )
+
+        region_all_query = get_region_all_items_price_query(clicked_region, conn=conn)
+        region_all_df = conn.execute_query(region_all_query)
         render_region_all_items_chart(region_all_df, clicked_region)
 
     # -------------------------
