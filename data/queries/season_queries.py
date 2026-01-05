@@ -2,47 +2,57 @@
 <RDS SQL 쿼리 생성>
 제철 식자재 지도 쿼리 생성 모듈
 """
+
 from typing import Optional
-import pandas as pd
-from .query_utils import build_where_country_clause
+from data.connection import DatabaseConnection
+
 
 def get_season(
-        ) -> pd.DataFrame:
+    conn: DatabaseConnection = None,
+) -> str:
     """
     mart_season_region_product에서 제철명 불러오기
     """
-    query = """
+    database, user = conn.get_config()
+    query = f"""
     SELECT DISTINCT season
-    FROM hive.gold.mart_season_region_product
+    FROM {database}.mart_season_region_product
     """
     return query.strip()
 
+
 def get_season_item_list(
-        ) -> pd.DataFrame:
+    conn: DatabaseConnection = None,
+) -> str:
     """
     mart_season_region_product에서 사용 가능한 제철 품목 목록 조회
     """
-    query = """
+    database, user = conn.get_config()
+    query = f"""
     SELECT DISTINCT 
         item_nm,
         kind_nm,
         CONCAT(item_nm, '(', kind_nm, ')') AS item_kind
-    FROM hive.gold.mart_season_region_product
+    FROM {database}.mart_season_region_product
     ORDER BY item_nm, kind_nm
     """
     return query.strip()
 
+
 def get_season_region_price_query(
     item_kind_filter: Optional[str] = None,
+    conn: DatabaseConnection = None,
 ) -> str:
     """
     제철 식자재 지역별 지도 쿼리 생성
     Args:
         item_kind_filter: 품목+품종 필터 (예: 사과(부사))
+        conn: 데이터베이스 연결 객체
     """
     where_sql = ""
     if item_kind_filter:
         where_sql = f"WHERE CONCAT(item_nm, '(', kind_nm, ')') = '{item_kind_filter}'"
+    database, user = conn.get_config()
 
     query = f"""
     SELECT
@@ -70,18 +80,24 @@ def get_season_region_price_query(
         END AS yoy_pct,
         -- price_rank 계산: base_pr 기준 오름차순
         RANK() OVER (ORDER BY base_pr ASC) AS price_rank
-    FROM hive.gold.mart_season_region_product
+    FROM {database}.mart_season_region_product
     {where_sql}
     """
     return query.strip()
 
-def get_region_all_items_price_query(country_filter: str) -> str:
+
+def get_region_all_items_price_query(
+    country_filter: str,
+    conn: DatabaseConnection = None,
+) -> str:
     """
     특정 지역의 모든 제철 식재료 가격 조회 + 전국 가격 순위
     Args:
         country_filter: 지역명 (예: 서울)
+        conn: 데이터베이스 연결 객체
     """
     where_sql = f"WHERE country_nm = '{country_filter}'"
+    database, user = conn.get_config()
 
     query = f"""
     WITH CTE AS (
@@ -98,7 +114,7 @@ def get_region_all_items_price_query(country_filter: str) -> str:
                 PARTITION BY CONCAT(item_nm, '(', kind_nm, ')')
                 ORDER BY base_pr ASC
             ) AS national_rank
-        FROM hive.gold.mart_season_region_product
+        FROM {database}.mart_season_region_product
     )
     SELECT *
     FROM CTE
