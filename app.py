@@ -158,11 +158,17 @@ if st.session_state.page == "main":
     country_list = (
         country_list_df["country_nm"].drop_duplicates().sort_values().tolist()
     )
+
+    if 'country' not in st.session_state:
+        if "서울" in country_list:
+            st.session_state.country = "서울"
+        else:
+            st.session_state.country = country_list[0]
+
     country = st.selectbox(
-        "지역 선택",
+        "지역 선택", 
         country_list,
-        index=country_list.index(st.session_state.country),
-        key="country",
+        key='country'
     )
     # st.markdown(f"선택된 지역: **{country}**")  # 선택 확인용
 
