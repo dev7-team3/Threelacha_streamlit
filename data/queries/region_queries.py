@@ -79,9 +79,9 @@ def get_region_stats_query(
     database, user = conn.get_config()
     query = f"""
     SELECT 
-        country_nm,
-        item_nm,
-        kind_nm,
+        country_nm as "지역",
+        item_nm as "품목",
+        kind_nm as "품종",
         AVG(avg_price) as "평균가격",
         MIN(min_price) as "최저가격",
         MAX(max_price) as "최고가격",

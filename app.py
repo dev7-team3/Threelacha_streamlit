@@ -361,9 +361,7 @@ elif st.session_state.page == "dist":
 
     try:
         # 날짜 필터 추가
-        col1, col2, col3 = st.columns([2, 2, 1])
-        with col1:
-            date_filter = st.date_input("날짜 선택", value=None, key="dist_date")
+        col2, col3 = st.columns([2, 2])
         with col2:
             category_filter = st.selectbox(
                 "카테고리 선택",
@@ -390,7 +388,6 @@ elif st.session_state.page == "dist":
 
         # 유통 vs 전통 비교 쿼리 생성
         comparison_query = get_channel_comparison_query(
-            date_filter=date_filter,
             category_filter=category_filter,
             limit=None,
             conn=conn,
@@ -404,8 +401,12 @@ elif st.session_state.page == "dist":
                     if len(df_comparison) > 0:
                         # 세션 상태에 쿼리 결과 저장
                         st.session_state.df_comparison = df_comparison
-                        st.session_state.query_date_filter = date_filter
                         st.session_state.query_category_filter = category_filter
+
+                        # 조회된 날짜 표시
+                        if "조회일자" in df_comparison.columns:
+                            latest_date = df_comparison["조회일자"].iloc[0]
+                            st.info(f"📅 조회된 데이터 날짜: {latest_date}")
 
                         # 요약 통계
                         st.subheader("📈 요약 통계")

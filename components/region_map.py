@@ -1,40 +1,21 @@
 """지역별 지도 시각화 컴포넌트"""
 
 import folium
+import branca.colormap as cm
+from folium import Element
 import pandas as pd
+import copy
 from typing import Optional
 import streamlit as st
 from streamlit_folium import st_folium
 from data.queries.region_queries import get_region_stats_query
 from data.connection import DatabaseConnection
-
-
-# 한국 주요 도시 좌표
-REGION_COORDINATES = {
-    "서울": [37.5665, 126.9780],
-    "부산": [35.1796, 129.0756],
-    "대구": [35.8714, 128.6014],
-    "인천": [37.4563, 126.7052],
-    "광주": [35.1595, 126.8526],
-    "대전": [36.3504, 127.3845],
-    "울산": [35.5384, 129.3114],
-    "세종": [36.4800, 127.2890],
-    "수원": [37.2636, 127.0286],
-    "성남": [37.4201, 127.1267],
-    "고양": [37.6584, 126.8320],
-    "용인": [37.2411, 127.1776],
-    "청주": [36.6424, 127.4890],
-    "천안": [36.8151, 127.1139],
-    "전주": [35.8242, 127.1480],
-    "포항": [36.0322, 129.3650],
-    "창원": [35.2279, 128.6819],
-    "김해": [35.2284, 128.8893],
-    "목포": [34.8118, 126.3922],
-    "여수": [34.7604, 127.6622],
-}
+import json
+from pathlib import Path
 
 
 def create_region_map(
+    geojson_data: dict,
     region_data: pd.DataFrame,
     price_column: str = "평균가격",
     region_column: str = "country_nm",
@@ -43,6 +24,7 @@ def create_region_map(
     """지역별 가격 데이터를 지도에 표시합니다.
 
     Args:
+        geojson_data: GeoJSON 데이터
         region_data: 지역별 가격 데이터 (country_nm, 평균가격 등 포함)
         price_column: 가격 컬럼명
         region_column: 지역명 컬럼명
@@ -51,104 +33,173 @@ def create_region_map(
     Returns:
         folium.Map: 지도 객체
     """
-    # 한국 중심 지도 생성 - CartoDB positron 타일 사용 (깔끔한 스타일)
     m = folium.Map(
-        location=[36.5, 127.5],  # 한국 중심 좌표
+        location=[35.5, 129.5],
         zoom_start=7,
-        tiles="openstreetmap",
+        min_zoom=7,
+        max_zoom=8,
+        tiles="Esri.WorldGrayCanvas",
     )
 
     # 데이터가 없으면 기본 지도만 반환
     if region_data.empty:
         return m
 
-    # 가격 범위 계산 (색상 구분을 위해)
-    if price_column in region_data.columns:
-        min_price = region_data[price_column].min()
-        max_price = region_data[price_column].max()
-        price_range = max_price - min_price if max_price > min_price else 1
-    else:
-        min_price = 0
-        max_price = 1
-        price_range = 1
+    # 1) 키 정규화: 문자열/공백 통일
+    region_data = region_data.copy()
+    region_data[region_column] = region_data[region_column].astype(str).str.strip()
 
-    # 색상 함수 (가격이 낮을수록 초록색, 높을수록 빨간색)
-    def get_color(price: float) -> str:
-        if pd.isna(price):
-            return "gray"
-        normalized = (price - min_price) / price_range
-        if normalized < 0.33:
-            return "green"  # 저렴
-        elif normalized < 0.67:
-            return "orange"  # 중간
-        else:
-            return "red"  # 비쌈
+    price_map = region_data.set_index(region_column).to_dict("index")
 
-    # 각 지역에 마커 추가
-    for _, row in region_data.iterrows():
-        region_name = row[region_column]
-        price = row.get(price_column, 0)
+    # 2) GeoJSON 딥카피 후 주입
+    geojson_enriched = copy.deepcopy(geojson_data)
 
-        # 좌표 가져오기
-        if region_name in REGION_COORDINATES:
-            coords = REGION_COORDINATES[region_name]
-        else:
-            continue  # 좌표가 없으면 스킵
+    # 3) 색상 스케일
+    vmin = region_data[price_column].min()
+    vmax = region_data[price_column].max()
+    colormap = cm.LinearColormap(
+        colors=["#2c7bb6", "#abd9e9", "#fdae61", "#d7191c"],  # Blue→Red
+        vmin=vmin,
+        vmax=vmax,
+    )
 
-        # 팝업 텍스트 생성 (간소화)
-        popup_text = f"""
-        <div style="font-family: Arial; width: 180px;">
-            <h4 style="margin: 5px 0; font-size: 16px;">{region_name}</h4>
-            <p style="margin: 5px 0; font-size: 14px;"><b>가격:</b> {price:,.0f}원</p>
-        """
+    # 범례 추가
+    item_display = selected_item if selected_item else "가격"
+    legend = Element(f"""
+    <div style="
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 9999;
+        background: rgba(255,255,255,0.9);
+        padding: 10px 14px;
+        border-radius: 6px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        font-size: 12px;
+    ">
 
-        if selected_item:
-            popup_text += f"<p style='margin: 5px 0; font-size: 12px; color: #666;'><b>품목:</b> {selected_item}</p>"
+        <!-- 제목 -->
+        <div style="
+            text-align:right;
+            margin-bottom:6px;
+            color: #000;
+        ">
+            <b>{item_display}</br>가격 (원)</b>
+        </div>
 
-        popup_text += "</div>"
+        <!-- 범례 본체 -->
+        <div style="position: relative; height: 160px;">
 
-        # 마커 추가 (더 깔끔한 스타일)
-        folium.CircleMarker(
-            location=coords,
-            radius=12 + (price / max_price * 15)
-            if max_price > 0
-            else 12,  # 가격에 비례한 크기
-            popup=folium.Popup(popup_text, max_width=200),
-            tooltip=f"{region_name}: {price:,.0f}원",
-            color="white",
-            weight=1.5,
-            fill=True,
-            fillColor=get_color(price),
-            fillOpacity=0.8,
-        ).add_to(m)
+            <!-- max 값 (왼쪽) -->
+            <div style="
+                position: absolute;
+                top: -2px;
+                right: 26px;
+                white-space: nowrap;
+                color: #d7191c;
+            ">
+                {vmax:,.0f}
+            </div>
 
-    # 범례 추가 (간소화된 스타일)
-    legend_html = f"""
-    <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 180px; 
-                background-color: white; border: 1px solid #ccc; border-radius: 5px;
-                z-index:9999; font-size: 12px; padding: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-    <h4 style="margin: 0 0 8px 0; font-size: 14px; font-weight: bold;">가격 범례</h4>
-    <p style="margin: 4px 0;"><span style="display: inline-block; width: 12px; height: 12px; background-color: green; border-radius: 50%; margin-right: 6px;"></span> 저렴</p>
-    <p style="margin: 4px 0;"><span style="display: inline-block; width: 12px; height: 12px; background-color: orange; border-radius: 50%; margin-right: 6px;"></span> 중간</p>
-    <p style="margin: 4px 0;"><span style="display: inline-block; width: 12px; height: 12px; background-color: red; border-radius: 50%; margin-right: 6px;"></span> 비쌈</p>
+            <!-- min 값 (왼쪽) -->
+            <div style="
+                position: absolute;
+                bottom: -2px;
+                right: 26px;
+                white-space: nowrap;
+                color: #2c7bb6;
+            ">
+                {vmin:,.0f}
+            </div>
+
+            <!-- 컬러바 -->
+            <div style="
+                position: absolute;
+                right: 0;
+                width: 18px;
+                height: 160px;
+                background: linear-gradient(
+                    to top,
+                    #2c7bb6,
+                    #abd9e9,
+                    #fdae61,
+                    #d7191c
+                );
+            "></div>
+
+        </div>
     </div>
-    """
-    m.get_root().html.add_child(folium.Element(legend_html))
+    """)
+
+    m.get_root().html.add_child(legend)
+
+    def style_function(feature):
+        props = feature.get("properties", {})
+        region = str(props.get("CITY_AB_NM", "")).strip()
+        if region in price_map:
+            price = price_map[region][price_column]
+            return {
+                "fillColor": colormap(price),
+                "color": "#ECBA82",
+                "weight": 1.2,
+                "fillOpacity": 0.8,
+            }
+        return {
+            "fillColor": "#eeeeee",
+            "color": "#cccccc",
+            "weight": 0.5,
+            "fillOpacity": 0.3,
+        }
+
+    for feat in geojson_enriched["features"]:
+        props = feat["properties"]
+        region = str(props.get("CITY_AB_NM", "")).strip()
+
+        if region in price_map:
+            # 값 주입
+            price_val = price_map[region][price_column]
+            props["price"] = price_val
+
+            # 안전한 포맷팅 처리
+            price_str = (
+                f"{int(price_val):,}원"
+                if price_val is not None and not pd.isna(price_val)
+                else "데이터 없음"
+            )
+            item_str = f"{selected_item}<br>" if selected_item else ""
+
+            tooltip_html = f"""
+            <b>{region}</b><br>
+            {item_str}가격: {price_str}
+            """
+
+            folium.GeoJson(
+                feat,
+                style_function=style_function,
+                tooltip=folium.Tooltip(tooltip_html, sticky=False),
+            ).add_to(m)
+        else:
+            # 데이터 없는 지역은 기본 스타일로 추가
+            folium.GeoJson(
+                feat,
+                style_function=style_function,
+            ).add_to(m)
 
     return m
 
 
 def render_region_map(
+    geojson_data: dict,
     region_data: pd.DataFrame,
     price_column: str = "평균가격",
-    region_column: str = "country_nm",
+    region_column: str = "지역",
     selected_item: Optional[str] = None,
     height: int = 500,
 ):
     """Streamlit에서 지역별 지도를 렌더링합니다.
 
     Args:
+        geojson_data: GeoJSON 데이터
         region_data: 지역별 가격 데이터
         price_column: 가격 컬럼명
         region_column: 지역명 컬럼명
@@ -160,7 +211,9 @@ def render_region_map(
         return
 
     # 지도 생성
-    m = create_region_map(region_data, price_column, region_column, selected_item)
+    m = create_region_map(
+        geojson_data, region_data, price_column, region_column, selected_item
+    )
 
     # Streamlit에 지도 표시
     st_folium(m, width=700, height=height, returned_objects=[])
@@ -187,6 +240,15 @@ def render_selected_item_region_map(
         f"🗺️ {st.session_state.selected_item_nm}({st.session_state.selected_kind_nm}) 지역별 가격 지도"
     )
 
+    # GeoJSON 로드
+    @st.cache_resource
+    def load_geojson():
+        path = Path("assets/retail_regions.json")
+        with path.open(encoding="utf-8") as f:
+            return json.load(f)
+
+    merged_geojson = load_geojson()
+
     # 지역별 데이터 조회
     region_stats_query = get_region_stats_query(
         date_filter=date_filter, category_filter=category_filter, conn=conn
@@ -199,14 +261,14 @@ def render_selected_item_region_map(
             if len(df_region) > 0:
                 # 선택된 품목 필터링
                 df_filtered = df_region[
-                    (df_region["item_nm"] == st.session_state.selected_item_nm)
-                    & (df_region["kind_nm"] == st.session_state.selected_kind_nm)
+                    (df_region["품목"] == st.session_state.selected_item_nm)
+                    & (df_region["품종"] == st.session_state.selected_kind_nm)
                 ]
 
                 if len(df_filtered) > 0:
                     # 지역별 평균 가격으로 그룹화
                     df_region_agg = (
-                        df_filtered.groupby("country_nm")
+                        df_filtered.groupby("지역")
                         .agg({"평균가격": "mean"})
                         .reset_index()
                     )
@@ -216,18 +278,18 @@ def render_selected_item_region_map(
                     # 지도 표시
                     with col1:
                         render_region_map(
+                            merged_geojson,
                             df_region_agg,
                             price_column="평균가격",
-                            region_column="country_nm",
+                            region_column="지역",
                             selected_item=f"{st.session_state.selected_item_nm}({st.session_state.selected_kind_nm})",
+                            height=650,
                         )
 
                     # 데이터 테이블도 함께 표시
                     with col2:
                         st.dataframe(
-                            df_filtered[
-                                ["country_nm", "평균가격", "최저가격", "최고가격"]
-                            ],
+                            df_filtered[["지역", "평균가격", "최저가격", "최고가격"]],
                             use_container_width=True,
                         )
 

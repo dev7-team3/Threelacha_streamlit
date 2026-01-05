@@ -238,7 +238,6 @@ def render_eco_page(conn: DatabaseConnection):
 
         with st.spinner("Athena에서 최신 데이터를 불러오는 중..."):
             try:
-                # Athena 쿼리 실행
                 df_data = conn.execute_query(latest_data_query)
 
                 if len(df_data) > 0:
