@@ -159,17 +159,13 @@ if st.session_state.page == "main":
         country_list_df["country_nm"].drop_duplicates().sort_values().tolist()
     )
 
-    if 'country' not in st.session_state:
+    if "country" not in st.session_state:
         if "서울" in country_list:
             st.session_state.country = "서울"
         else:
             st.session_state.country = country_list[0]
 
-    country = st.selectbox(
-        "지역 선택", 
-        country_list,
-        key='country'
-    )
+    country = st.selectbox("지역 선택", country_list, key="country")
     # st.markdown(f"선택된 지역: **{country}**")  # 선택 확인용
 
     c1, c2, c3 = st.columns(3)
@@ -365,15 +361,44 @@ elif st.session_state.page == "dist":
         with header_left:
             st.title("유통업체별 농수산물 가격 비교 한눈에 보기")
         with header_right:
+            # 유통업체 데이터를 먼저 조회하여 메타 정보 표시
+            try:
+                # 전체 카테고리로 최신 데이터 조회
+                temp_query = get_channel_comparison_query(
+                    category_filter="전체",
+                    limit=None,
+                    conn=conn,
+                )
+                df_temp = conn.execute_query(temp_query)
+
+                if len(df_temp) > 0:
+                    latest_date = (
+                        df_temp["조회일자"].iloc[0]
+                        if "조회일자" in df_temp.columns
+                        else "N/A"
+                    )
+                    unique_items = (
+                        df_temp["item_nm"].nunique()
+                        if "item_nm" in df_temp.columns
+                        else 0
+                    )
+                    total_comparisons = len(df_temp)
+                else:
+                    latest_date = "N/A"
+                    unique_items = 0
+                    total_comparisons = 0
+            except Exception:
+                latest_date = "N/A"
+                unique_items = 0
+                total_comparisons = 0
+
             m1, m2, m3 = st.columns(3)
-            m1.metric(label="📅 최신 업데이트", value=str(update_status["latest_date"]))
+            m1.metric(label="📅 최신 데이터", value=str(latest_date))
             m2.metric(
-                label="📦 업데이트 품목 수",
-                value=f"{int(update_status['row_count']):,}",
+                label="📦 비교 품목 수",
+                value=f"{unique_items:,}개",
             )
-            m3.metric(
-                label="🌍 업데이트 지역 수", value=int(update_status["country_count"])
-            )
+            m3.metric(label="🔍 비교 항목 수", value=f"{total_comparisons:,}개")
     st.divider()
 
     # -------------------------
