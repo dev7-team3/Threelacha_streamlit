@@ -66,7 +66,7 @@ def render_region_all_items_chart(region_all_df: pd.DataFrame, clicked_region: s
         return
 
     chart = alt.Chart(region_all_df).mark_bar().encode(
-        y=alt.Y("item_kind:N", title="품목"),
+        y=alt.Y("item_kind:N", title="품목", axis=alt.Axis(titleAngle=0, titleAnchor="start")),
         x=alt.X("base_pr:Q", title="가격(원)"),
         color=alt.Color(
             "national_rank:Q",#O,
