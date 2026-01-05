@@ -57,9 +57,14 @@ h1 { font-size: 1.8rem; }
 h2 { font-size: 1.4rem; }
 h3 { font-size: 1.1rem; }
 
-/* 본문 전체 폰트 */ html, body, [class*="css"] {
+/* 본문 전체 폰트 */ html, body, [data-testid="stAppViewContainer"] {
+    font-family: 'PureunJeonnam', sans-serif;
+}
+
+div[data-testid="stMetricValue"] {
     font-family: 'ChangwonDangamAsac', sans-serif;
 }
+
 
 /* 기본 요소 간격 보정 */
 [data-testid="stVerticalBlock"] > div {
@@ -91,11 +96,11 @@ Custom Callout Box
     color: #1f2937;                  /* 기본 텍스트 색 */
     font-size: 14px;
     line-height: 1.6;
-    font-family: 'ChangwonDangamRound', sans-serif;
+    font-family: 'ChangwonDangam', sans-serif;
 }
 
 .callout-title {
-    font-family: 'ChangwonDangamAsacBold', sans-serif;
+    font-family: 'ChangwonDangamAsac', sans-serif;
     font-weight: 700;
     margin-bottom: 6px;
     color: #1e3a8a;

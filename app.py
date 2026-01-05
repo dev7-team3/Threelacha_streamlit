@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import base64
 from pathlib import Path
 
 import pandas as pd
@@ -52,6 +53,100 @@ from data.queries.season_queries import (
 
 
 def load_css():
+    def get_base64_of_bin_file(bin_file):
+        with open(bin_file, 'rb') as f:
+            data = f.read()
+        return base64.b64encode(data).decode()
+    
+    font_files = {
+        "PureunJeonnam": "assets/fonts/PureunJeonnam.ttf",
+        "PureunJeonnam-Medium": "assets/fonts/PureunJeonnam-Medium.ttf",
+        "PureunJeonnam-Bold": "assets/fonts/PureunJeonnam-Bold.ttf",
+        "ChangwonDangam": "assets/fonts/ChangwonDangamRound.ttf", 
+        "ChangwonDangam-OTF": "assets/fonts/ChangwonDangamRound.otf",
+        "ChangwonDangamAsac": "assets/fonts/ChangwonDangamAsac-Bold.ttf",
+        "BusanFont": "assets/fonts/BusanFont_Provisional.ttf"
+    }
+
+    try:
+        font_css = f"""
+        <style>
+        /* === 폰트 정의 (Base64) === */
+        
+        /* 1. 푸른전남 정의 */
+        @font-face {{
+            font-family: 'PureunJeonnam';
+            src: url(data:font/ttf;charset=utf-8;base64,{get_base64_of_bin_file(font_files['PureunJeonnam'])}) format('truetype');
+            font-weight: 400;
+        }}
+        @font-face {{
+            font-family: 'PureunJeonnam';
+            src: url(data:font/ttf;charset=utf-8;base64,{get_base64_of_bin_file(font_files['PureunJeonnam-Medium'])}) format('truetype');
+            font-weight: 500;
+        }}
+        @font-face {{
+            font-family: 'PureunJeonnam';
+            src: url(data:font/ttf;charset=utf-8;base64,{get_base64_of_bin_file(font_files['PureunJeonnam-Bold'])}) format('truetype');
+            font-weight: 700;
+        }}
+
+        /* 2. 창원단감 정의 (TTF 우선 사용) */
+        @font-face {{
+            font-family: 'ChangwonDangam';
+            src: url(data:font/ttf;charset=utf-8;base64,{get_base64_of_bin_file(font_files['ChangwonDangam'])}) format('truetype');
+            font-weight: 500;
+        }}
+        
+        /* 2-1. 창원단감 OTF 정의 (필요시 'ChangwonDangamOTF'로 사용 가능) */
+        @font-face {{
+            font-family: 'ChangwonDangamOTF';
+            src: url(data:font/opentype;charset=utf-8;base64,{get_base64_of_bin_file(font_files['ChangwonDangam-OTF'])}) format('opentype');
+            font-weight: 500;
+        }}
+
+        /* 3. 창원단감 아삭 정의 */
+        @font-face {{
+            font-family: 'ChangwonDangamAsac';
+            src: url(data:font/ttf;charset=utf-8;base64,{get_base64_of_bin_file(font_files['ChangwonDangamAsac'])}) format('truetype');
+            font-weight: 700;
+        }}
+
+        /* 4. 부산체 정의 */
+        @font-face {{
+            font-family: 'BusanFont';
+            src: url(data:font/ttf;charset=utf-8;base64,{get_base64_of_bin_file(font_files['BusanFont'])}) format('truetype');
+            font-weight: 400;
+        }}
+
+        /* === 폰트 적용 규칙 === */
+        
+        /* 전체 본문: 푸른전남 */
+        html, body, [data-testid="stAppViewContainer"] {{
+            font-family: 'PureunJeonnam', sans-serif !important;
+        }}
+
+        /* 제목 (H1~H3): 창원단감 */
+        h1, h2, h3 {{
+            font-family: 'ChangwonDangam', sans-serif !important;
+        }}
+
+        /* 숫자/강조: 창원단감 아삭 */
+        div[data-testid="stMetricValue"], .callout-title {{
+            font-family: 'ChangwonDangamAsac', sans-serif !important;
+        }}
+        
+        /* 콜아웃 박스 본문 */
+        .callout {{
+            font-family: 'PureunJeonnam', sans-serif !important;
+        }}
+        </style>
+        """
+        # 생성된 폰트 CSS 주입
+        st.markdown(font_css, unsafe_allow_html=True)
+
+    except FileNotFoundError as e:
+        st.error(f"폰트 파일을 찾을 수 없습니다. 경로를 확인해주세요: {e}")
+
     base_path = Path(__file__).parent
     with open(base_path / "styles.css", encoding="utf-8") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
