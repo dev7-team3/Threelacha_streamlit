@@ -359,32 +359,39 @@ elif st.session_state.page == "dist":
     st.title("일반 농수산물 살펴보기")
     st.divider()
 
+    st.markdown(
+        """
+        <div class="callout">
+            <div class="callout-title">💡 어떻게 보면 좋을까요?</div>
+            <b>유통</b>과 <b>전통시장</b>의 가격을 비교해보세요.<br><br>
+            카테고리를 선택하면 해당 카테고리의 <b>유통 vs 전통 가격 비교</b>를 확인할 수 있어요.<br>
+            요약 통계를 통해 <b>평균 가격 차이</b>를 한눈에 파악할 수 있습니다.<br><br>
+            각 품목별로
+            <ul>
+                <li><b>유통과 전통의 가격 차이</b>를 확인하여 어디서 구매하는 것이 유리한지 비교해보세요.</li>
+                <li>특정 품목을 선택하면 <b>지역별 가격 지도</b>를 통해 지역별 가격 분포를 확인할 수 있어요.</li>
+                <li>원본 데이터를 확인하여 <b>상세한 가격 정보</b>를 살펴볼 수 있습니다.</li>
+            </ul>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     try:
-        # 날짜 필터 추가
-        col2, col3 = st.columns([2, 2])
-        with col2:
-            category_filter = st.selectbox(
-                "카테고리 선택",
-                [
-                    "전체",
-                    "식량작물",
-                    "채소류",
-                    "특용작물",
-                    "과일류",
-                    "축산물",
-                    "수산물",
-                ],
-                key="dist_category",
-            )
-        with col3:
-            # 버튼을 아래로 정렬하기 위한 빈 공간 추가
-            st.markdown("<br>", unsafe_allow_html=True)
-            query_button = st.button(
-                "데이터 조회",
-                type="primary",
-                key="dist_query_button",
-                use_container_width=True,
-            )
+        # 카테고리 필터
+        category_filter = st.selectbox(
+            "카테고리 선택",
+            [
+                "전체",
+                "식량작물",
+                "채소류",
+                "특용작물",
+                "과일류",
+                "축산물",
+                "수산물",
+            ],
+            key="dist_category",
+        )
 
         # 유통 vs 전통 비교 쿼리 생성
         comparison_query = get_channel_comparison_query(
@@ -393,7 +400,13 @@ elif st.session_state.page == "dist":
             conn=conn,
         )
 
-        if query_button:
+        # 카테고리 필터가 변경되었거나 세션 상태에 데이터가 없으면 쿼리 실행
+        should_query = (
+            "df_comparison" not in st.session_state
+            or st.session_state.get("query_category_filter") != category_filter
+        )
+
+        if should_query:
             with st.spinner("데이터를 불러오는 중..."):
                 try:
                     df_comparison = conn.execute_query(comparison_query)
@@ -446,13 +459,14 @@ elif st.session_state.page == "dist":
                 except Exception as e:
                     st.error(f"데이터 조회 중 오류 발생: {str(e)}")
                     st.info("💡 Athena 연결 설정을 확인하세요.")
-
-        # 쿼리 버튼이 눌러지지 않았지만 이전에 조회한 데이터가 있고 지도 표시 요청이 있는 경우
-        elif (
-            "df_comparison" in st.session_state
-            and len(st.session_state.df_comparison) > 0
-        ):
+        else:
+            # 이전에 조회한 데이터가 있고 필터가 변경되지 않은 경우
             df_comparison = st.session_state.df_comparison
+
+            # 조회된 날짜 표시
+            if "조회일자" in df_comparison.columns:
+                latest_date = df_comparison["조회일자"].iloc[0]
+                st.info(f"📅 조회된 데이터 날짜: {latest_date}")
 
             # 요약 통계
             st.subheader("📈 요약 통계")
@@ -481,22 +495,8 @@ elif st.session_state.page == "dist":
                 category_filter=st.session_state.get("query_category_filter"),
             )
 
-            st.divider()
-            st.subheader("📊 유통 vs 전통 가격 비교")
-            st.dataframe(df_comparison, use_container_width=True)
-
     except Exception as e:
         st.error(f"연결 오류: {str(e)}")
-        st.info("""
-        **Athena 연결 설정 확인:**
-        - AWS 자격 증명이 설정되어 있는지 확인
-        - 환경 변수 설정 확인:
-          - `AWS_ACCESS_KEY_ID`: AWS Access Key
-          - `AWS_SECRET_ACCESS_KEY`: AWS Secret Key
-          - `AWS_REGION`: 기본값 `ap-northeast-2`
-          - `ATHENA_DATABASE`: 기본값 `team3_gold`
-          - `ATHENA_WORKGROUP`: 기본값 `team3-wg`
-        """)
 
 # 사이드바 하단에 연결 정보 표시
 with st.sidebar:

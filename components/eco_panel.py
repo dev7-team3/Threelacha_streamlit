@@ -232,11 +232,28 @@ def render_eco_page(conn: DatabaseConnection):
     st.title("친환경 살펴보기")
     st.divider()
 
+    st.markdown(
+        """
+        <div class="callout">
+            <div class="callout-title">💡 어떻게 보면 좋을까요?</div>
+            친환경 농수산물의 <b>마트별 가격 비교</b>를 확인할 수 있어요.<br><br>
+            <b>가격차이가 큰 상위 6개 품목</b>을 카드 형태로 확인하여<br>
+            어느 마트에서 구매하는 것이 가장 경제적인지 비교해보세요.<br><br>
+            각 카드에서
+            <ul>
+                <li><b>최저가 마트</b>는 초록색으로 강조되어 표시됩니다.</li>
+                <li><b>최고가와 최저가의 차이</b>를 한눈에 확인할 수 있어요.</li>
+                <li>원본 데이터를 펼쳐서 <b>상세한 가격 정보</b>를 확인할 수 있습니다.</li>
+            </ul>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     try:
         # 최신 데이터 쿼리 가져오기
         latest_data_query = get_latest_price_statistics_query(conn=conn)
 
-        with st.spinner("Athena에서 최신 데이터를 불러오는 중..."):
+        with st.spinner("데이터베이스에서 최신 데이터를 불러오는 중..."):
             try:
                 df_data = conn.execute_query(latest_data_query)
 

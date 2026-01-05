@@ -77,6 +77,18 @@ def get_region_stats_query(
     """
     where_sql = build_where_clause(date_filter, category_filter)
     database, user = conn.get_config()
+
+    # "기타" 지역 제외 조건 추가
+    exclude_condition = "country_nm != '기타'"
+
+    # WHERE 절 구성
+    if where_sql:
+        # 기존 WHERE 절이 있으면 AND로 추가
+        where_sql = where_sql + f" AND {exclude_condition}"
+    else:
+        # WHERE 절이 없으면 새로 생성
+        where_sql = f"WHERE {exclude_condition}"
+
     query = f"""
     SELECT 
         country_nm as "지역",
