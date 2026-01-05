@@ -155,16 +155,17 @@ if st.session_state.page == "main":
     country_list = country_list_df['country_nm'].drop_duplicates().sort_values().tolist()
 
     if 'country' not in st.session_state:
-        st.session_state.country = country_list[0]
+        if "서울" in country_list:
+            st.session_state.country = "서울"
+        else:
+            st.session_state.country = country_list[0]
 
     country = st.selectbox(
         "지역 선택", 
         country_list,
-        index=country_list.index(st.session_state.country),
         key='country'
     )
     # st.markdown(f"선택된 지역: **{country}**")  # 선택 확인용
-
 
     c1, c2, c3 = st.columns(3)
 
@@ -222,16 +223,6 @@ if st.session_state.page == "main":
         """,
         unsafe_allow_html=True
     )
-
-    # -----------------------
-    # 1️⃣ RDS 연결용
-    # -----------------------
-    # season_query = query함수(
-    #     filter 뭐시기, conn = conn
-    # )
-    # season_df = conn.execute_query(season_query)
-
-    # render_season_cards(season_df)
 
     # -----------------------------
     # [PART 2: season] select item
@@ -320,6 +311,9 @@ if st.session_state.page == "main":
             returned_objects=["last_active_drawing"]
         )
 
+    # ----------------------------
+    # [PART 2: season] bar charts
+    # ----------------------------
     clicked_region = None
     if _map_state and _map_state.get("last_active_drawing"):
         clicked_region = _map_state["last_active_drawing"]["properties"]["CITY_AB_NM"]
