@@ -2,7 +2,7 @@
 
 import streamlit as st
 import pandas as pd
-from data.queries.eco_channel_queries import get_latest_price_statistics_query
+import altair as alt
 from data.connection import DatabaseConnection
 
 
@@ -104,6 +104,75 @@ def render_market_price_card(
         st.markdown("</div>", unsafe_allow_html=True)
 
 
+def render_market_avg_price_chart(df_data: pd.DataFrame):
+    """마트별 평균 가격 비교 바 차트를 렌더링합니다.
+
+    Args:
+        df_data: 데이터프레임
+    """
+    if df_data.empty or "market_category" not in df_data.columns:
+        return
+
+    # 마트별 평균 가격 계산
+    market_avg = (
+        df_data.groupby("market_category")["avg_price"]
+        .mean()
+        .reset_index()
+        .sort_values("avg_price")
+    )
+
+    chart = (
+        alt.Chart(market_avg)
+        .mark_bar()
+        .encode(
+            x=alt.X(
+                "market_category:N",
+                title="마트",
+                sort="-y",
+                axis=alt.Axis(labelAngle=0),
+            ),
+            y=alt.Y("avg_price:Q", title="평균 가격(원)", axis=alt.Axis(format=",.0f")),
+            color=alt.Color(
+                "market_category:N",
+                scale=alt.Scale(
+                    domain=market_avg["market_category"].tolist(),
+                    range=["#4A90E2", "#28a745", "#dc3545", "#ffc107", "#6c757d"][
+                        : len(market_avg)
+                    ],
+                ),
+                legend=None,
+            ),
+            tooltip=[
+                alt.Tooltip("market_category:N", title="마트"),
+                alt.Tooltip("avg_price:Q", title="평균 가격", format=",.0f"),
+            ],
+        )
+        .properties(width=600, height=400)
+    )
+
+    text = (
+        alt.Chart(market_avg)
+        .mark_text(
+            dy=-10,
+            align="center",
+            fontSize=12,
+        )
+        .encode(
+            x="market_category:N",
+            y="avg_price:Q",
+            text=alt.Text("avg_price:Q", format=",.0f"),
+        )
+    )
+
+    st.markdown(
+        "<h6 style='text-align:center;'>마트별 평균 가격 비교</h6>",
+        unsafe_allow_html=True,
+    )
+
+    final_chart = (chart + text).properties(width=600, height=400)
+    st.altair_chart(final_chart, use_container_width=True)
+
+
 def render_eco_summary_stats(df_data: pd.DataFrame):
     """요약 통계를 렌더링합니다.
 
@@ -193,11 +262,11 @@ def render_price_comparison_pivot(df_data: pd.DataFrame):
                         "price_diff": price_diff,
                     })
 
-            # 2열로 카드 배치 (각 열에 3개씩)
-            col1, col2 = st.columns(2)
+            # 3열로 카드 배치 (각 열에 2개씩)
+            col1, col2, col3 = st.columns(3)
 
             with col1:
-                for i in range(0, len(card_data), 2):
+                for i in range(0, len(card_data), 3):
                     render_market_price_card(
                         index=i,
                         item_nm=card_data[i]["item_nm"],
@@ -207,7 +276,17 @@ def render_price_comparison_pivot(df_data: pd.DataFrame):
                     )
 
             with col2:
-                for i in range(1, len(card_data), 2):
+                for i in range(1, len(card_data), 3):
+                    render_market_price_card(
+                        index=i,
+                        item_nm=card_data[i]["item_nm"],
+                        price_data=card_data[i]["price_data"],
+                        price_diff=card_data[i]["price_diff"],
+                        border_color="#4A90E2",
+                    )
+
+            with col3:
+                for i in range(2, len(card_data), 3):
                     render_market_price_card(
                         index=i,
                         item_nm=card_data[i]["item_nm"],
@@ -229,14 +308,67 @@ def render_price_comparison_pivot(df_data: pd.DataFrame):
 
 def render_eco_page(conn: DatabaseConnection):
     """친환경 페이지 전체를 렌더링합니다."""
-    st.title("친환경 살펴보기")
+    # -------------------------
+    # header
+    # -------------------------
+    header_container = st.container()
+    with header_container:
+        header_left, header_right = st.columns([3, 2])
+        with header_left:
+            st.title("친환경 농수산물 비교 한눈에 보기")
+        with header_right:
+            # 최신 데이터를 먼저 조회하여 메타 정보 표시
+            from data.queries.eco_channel_queries import (
+                get_latest_price_statistics_query,
+            )
+
+            try:
+                latest_data_query = get_latest_price_statistics_query(conn=conn)
+                df_temp = conn.execute_query(latest_data_query)
+
+                if len(df_temp) > 0:
+                    latest_date = (
+                        df_temp["res_dt"].iloc[0]
+                        if "res_dt" in df_temp.columns
+                        else "N/A"
+                    )
+                    unique_items = (
+                        df_temp["item_nm"].nunique()
+                        if "item_nm" in df_temp.columns
+                        else 0
+                    )
+                    unique_markets = (
+                        df_temp["market_category"].nunique()
+                        if "market_category" in df_temp.columns
+                        else 0
+                    )
+                else:
+                    latest_date = "N/A"
+                    unique_items = 0
+                    unique_markets = 0
+            except Exception:
+                latest_date = "N/A"
+                unique_items = 0
+                unique_markets = 0
+
+            m1, m2, m3 = st.columns(3)
+            m1.metric(label="📅 최신 데이터", value=str(latest_date))
+            m2.metric(
+                label="🌱 친환경 품목 수",
+                value=f"{unique_items:,}개",
+            )
+            m3.metric(label="🏪 비교 마트 수", value=f"{unique_markets:,}개")
     st.divider()
 
+    # -------------------------
+    # [part 1: price comparison] sub-title
+    # -------------------------
+    st.subheader("🌱 친환경 농수산물 마트별 가격 비교")
     st.markdown(
         """
         <div class="callout">
             <div class="callout-title">💡 어떻게 보면 좋을까요?</div>
-            친환경 농수산물의 <b>마트별 가격 비교</b>를 확인할 수 있어요.<br><br>
+            친환경 농수산물의 <b>마트별 가격 비교</b>를 확인할 수 있어요.<br>
             <b>가격차이가 큰 상위 6개 품목</b>을 카드 형태로 확인하여<br>
             어느 마트에서 구매하는 것이 가장 경제적인지 비교해보세요.<br><br>
             각 카드에서
@@ -258,21 +390,20 @@ def render_eco_page(conn: DatabaseConnection):
                 df_data = conn.execute_query(latest_data_query)
 
                 if len(df_data) > 0:
-                    # 최신 데이터 날짜 표시
-                    latest_date = (
-                        df_data["res_dt"].iloc[0]
-                        if "res_dt" in df_data.columns
-                        else "N/A"
-                    )
-                    st.info(f"📅 최신 데이터 날짜: {latest_date}")
-
                     # 요약 통계
                     render_eco_summary_stats(df_data)
 
                     st.divider()
 
+                    # 마트별 평균 가격 비교 그래프
+                    st.subheader("📊 마트별 평균 가격 비교")
+                    render_market_avg_price_chart(df_data)
+
+                    st.divider()
+
                     # 마트별 가격 비교 피봇 테이블
                     render_price_comparison_pivot(df_data)
+
                 else:
                     st.info("조회된 데이터가 없습니다.")
 

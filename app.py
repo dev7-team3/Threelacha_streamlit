@@ -96,7 +96,7 @@ if "selected_kind_nm" not in st.session_state:
 # 사이드바 (좌측 탭)
 # -------------------------
 with st.sidebar:
-    st.title("메뉴")
+    st.markdown("<h1 style='color:#555555;'>메뉴</h1>", unsafe_allow_html=True)
 
     if st.button("🧺 오늘의 식재료", use_container_width=True):
         st.session_state.page = "main"
@@ -107,9 +107,9 @@ with st.sidebar:
     if st.button("🏪 유통업체별 정보", use_container_width=True):
         st.session_state.page = "dist"
 
-    st.divider()
+    # st.divider()
 
-    st.caption("필터 영역 (추후 추가)")
+    # st.caption("필터 영역 (추후 추가)")
 
 # -------------------------
 # 메인 콘텐츠
@@ -356,21 +356,41 @@ elif st.session_state.page == "eco":
 # 유통업체 페이지
 # =================================================
 elif st.session_state.page == "dist":
-    st.title("일반 농수산물 살펴보기")
+    # -------------------------
+    # header
+    # -------------------------
+    header_container = st.container()
+    with header_container:
+        header_left, header_right = st.columns([3, 2])
+        with header_left:
+            st.title("유통업체별 농수산물 가격 비교 한눈에 보기")
+        with header_right:
+            m1, m2, m3 = st.columns(3)
+            m1.metric(label="📅 최신 업데이트", value=str(update_status["latest_date"]))
+            m2.metric(
+                label="📦 업데이트 품목 수",
+                value=f"{int(update_status['row_count']):,}",
+            )
+            m3.metric(
+                label="🌍 업데이트 지역 수", value=int(update_status["country_count"])
+            )
     st.divider()
 
+    # -------------------------
+    # [part 1: channel comparison] sub-title
+    # -------------------------
+    st.subheader("🏪 유통 vs 전통시장 가격 비교")
     st.markdown(
         """
         <div class="callout">
             <div class="callout-title">💡 어떻게 보면 좋을까요?</div>
-            <b>유통</b>과 <b>전통시장</b>의 가격을 비교해보세요.<br><br>
+            <b>유통</b>과 <b>전통시장</b>의 가격을 비교해보세요.<br>
             카테고리를 선택하면 해당 카테고리의 <b>유통 vs 전통 가격 비교</b>를 확인할 수 있어요.<br>
             요약 통계를 통해 <b>평균 가격 차이</b>를 한눈에 파악할 수 있습니다.<br><br>
             각 품목별로
             <ul>
                 <li><b>유통과 전통의 가격 차이</b>를 확인하여 어디서 구매하는 것이 유리한지 비교해보세요.</li>
                 <li>특정 품목을 선택하면 <b>지역별 가격 지도</b>를 통해 지역별 가격 분포를 확인할 수 있어요.</li>
-                <li>원본 데이터를 확인하여 <b>상세한 가격 정보</b>를 살펴볼 수 있습니다.</li>
             </ul>
         </div>
         """,
@@ -416,11 +436,6 @@ elif st.session_state.page == "dist":
                         st.session_state.df_comparison = df_comparison
                         st.session_state.query_category_filter = category_filter
 
-                        # 조회된 날짜 표시
-                        if "조회일자" in df_comparison.columns:
-                            latest_date = df_comparison["조회일자"].iloc[0]
-                            st.info(f"📅 조회된 데이터 날짜: {latest_date}")
-
                         # 요약 통계
                         st.subheader("📈 요약 통계")
                         summary_col1, summary_col2, summary_col3 = st.columns(3)
@@ -449,10 +464,6 @@ elif st.session_state.page == "dist":
                                 "query_category_filter"
                             ),
                         )
-
-                        st.divider()
-                        st.subheader("📊 유통 vs 전통 가격 비교")
-                        st.dataframe(df_comparison, use_container_width=True)
                     else:
                         st.info("조회된 데이터가 없습니다.")
 
@@ -462,11 +473,6 @@ elif st.session_state.page == "dist":
         else:
             # 이전에 조회한 데이터가 있고 필터가 변경되지 않은 경우
             df_comparison = st.session_state.df_comparison
-
-            # 조회된 날짜 표시
-            if "조회일자" in df_comparison.columns:
-                latest_date = df_comparison["조회일자"].iloc[0]
-                st.info(f"📅 조회된 데이터 날짜: {latest_date}")
 
             # 요약 통계
             st.subheader("📈 요약 통계")
@@ -498,14 +504,14 @@ elif st.session_state.page == "dist":
     except Exception as e:
         st.error(f"연결 오류: {str(e)}")
 
-# 사이드바 하단에 연결 정보 표시
-with st.sidebar:
-    st.markdown("---")
-    st.markdown("### 연결 정보")
+# # 사이드바 하단에 연결 정보 표시
+# with st.sidebar:
+#     st.markdown("---")
+#     st.markdown("### 연결 정보")
 
-    # 현재 페이지에 따라 다른 연결 정보 표시
-    st.info(f"""
-    **{conn.__class__.__name__} 설정:**
-    - Database: {conn.get_config()[0]}
-    - WorkGroup: {conn.get_config()[1]}
-    """)
+#     # 현재 페이지에 따라 다른 연결 정보 표시
+#     st.info(f"""
+#     **{conn.__class__.__name__} 설정:**
+#     - Database: {conn.get_config()[0]}
+#     - WorkGroup: {conn.get_config()[1]}
+#     """)
