@@ -108,7 +108,7 @@ def load_css():
         @font-face {{
             font-family: 'ChangwonDangamAsac';
             src: url(data:font/ttf;charset=utf-8;base64,{get_base64_of_bin_file(font_files['ChangwonDangamAsac'])}) format('truetype');
-            font-weight: 700;
+            font-weight: 500;
         }}
 
         /* 4. 부산체 정의 */
