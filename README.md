@@ -71,14 +71,8 @@ THREELACHA_STREAMLIT/
 │       └── deploy.yml              # EC2 Streamlit 자동 배포 파이프라인
 │
 ├── assets/
+│   ├── demo/                       # README용 시연 GIF
 │   ├── fonts/                      # 커스텀 한글 폰트
-│   │   ├── PureunJeonnam.ttf
-│   │   ├── PureunJeonnam-Medium.ttf
-│   │   ├── PureunJeonnam-Bold.ttf
-│   │   ├── ChangwonDangamRound.ttf
-│   │   ├── ChangwonDangamRound.otf
-│   │   ├── ChangwonDangamAsac-Bold.ttf
-│   │   └── BusanFont_Provisional.ttf
 │   ├── korea_sido.json             # 행정구역 GeoJSON
 │   └── retail_regions.json         # 유통 권역 GeoJSON
 │
