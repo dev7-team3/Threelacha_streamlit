@@ -48,17 +48,15 @@ Airflow + dbt 파이프라인을 통해 적재·가공된 데이터를 기반으
 git clone git@github.com:dev7-team3/Threelacha_streamlit.git
 cd Threelacha_streamlit
 ```
-### 2️⃣ uv 환경 구성
+### 2️⃣ Docker 실행
 ```
-curl -LsSf https://astral.sh/uv/install.sh | bash
-uv sync
+docker run -d \
+     --name threelacha-streamlit \
+     --restart unless-stopped \
+     -p 8501:8501 \
+     --env-file /home/ubuntu/Threelacha_streamlit/.env \
+     threelacha-streamlit:latest
 ``` 
-### 3️⃣ 로컬 실행
-```
-streamlit run app.py \
-  --server.address 0.0.0.0 \
-  --server.port 8501
-```
 
 ---
 
