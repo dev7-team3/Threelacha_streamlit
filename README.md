@@ -169,4 +169,6 @@ RDS_PASSWORD=
 
 Threelacha Data Engineering Team
 
+[구다혜](https://github.com/dahye83) [김지연](https://github.com/Jiyeon0027)  [박정은](https://github.com/jjung121) [정수진](https://github.com/jipipes) 
+
 ---
